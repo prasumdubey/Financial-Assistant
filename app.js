@@ -277,6 +277,24 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
     res.render('dashboard', { user: user });
 });
 
+app.get('/api/user-data', (req, res) => {
+    const query = 'SELECT * FROM financial_info WHERE email = ?';
+    if (!req.session || !req.session.email) {
+        return res.status(401).send('User not authenticated');
+    }
+    db.query(query, [req.session.email], (err, result) => {
+        if (err) {
+            console.error(err);
+            res.status(500).send('Server error');
+        } else if (result.length === 0) {
+            res.status(404).send('User not found');
+        } else {
+            res.json(result[0]); // Send only the first result
+        }
+    });
+});
+
+
 // GET and POST routes for profile settings (protected)
 app.get('/profile', isAuthenticated, (req, res) => {
     const query = 'SELECT * FROM users WHERE email = ?';
@@ -290,6 +308,7 @@ app.get('/profile', isAuthenticated, (req, res) => {
         res.render('profile', { user });
     });
 });
+
 
 app.post('/edit-profile', isAuthenticated, (req, res) => {
     const { 
@@ -433,8 +452,56 @@ app.post('/financial-details', isAuthenticated, (req, res) => {
 
 // Route to render the predict investment page
 app.get('/predict-investment', isAuthenticated, (req, res) => {
-    res.render('predict-investment');
+    const user = req.session.user || { full_name: "Guest" };
+    res.render('predict-investment', { user: user });
 });
+
+// app.post('/can-invest', isAuthenticated, (req, res) => {
+//     const query = `
+//         SELECT 
+//             fi.income, fi.total_assets, fi.expenses, fi.debt,
+//             fi.total_liabilities, fi.savings, fi.profit,
+//             u.age
+//         FROM 
+//             financial_info fi
+//         JOIN 
+//             users u ON fi.email = u.email
+//         WHERE 
+//             fi.email = ?
+//     `;
+
+//     db.query(query, [req.session.email], (err, results) => {
+//         if (err) {
+//             console.error('Error fetching financial data:', err);
+//             return res.status(500).send('Error fetching financial data.');
+//         }
+
+//         if (results.length === 0) {
+//             return res.status(404).send('No financial data found.');
+//         }
+
+//         const data = results[0];
+
+//         // Normalize age to affect safeMoney: younger users may be encouraged to invest more
+//         let ageFactor = 1;
+//         if (data.age < 30) ageFactor = 1.1; // boost for younger users
+//         else if (data.age >= 30 && data.age <= 50) ageFactor = 1.0;
+//         else ageFactor = 0.9; // reduce for older users nearing retirement
+
+//         // Apply feature if you want it to positively influence safeMoney (custom weight: 0.3)
+//         const safeMoney = (
+//             0.5 * (parseFloat(data.income) - parseFloat(data.expenses)) +
+//             0.2 * parseFloat(data.total_assets) -
+//             0.7 * parseFloat(data.debt) -
+//             0.6 * parseFloat(data.total_liabilities) +
+//             0.4 * parseFloat(data.savings) +
+//             0.5 * parseFloat(data.profit)
+//         ) * ageFactor;
+
+//         res.json({ safeMoney: safeMoney.toFixed(2) });
+//     });
+// });
+
 app.post('/can-invest', isAuthenticated, (req, res) => {
     const query = 'SELECT income, total_assets, expenses, debt, total_liabilities, savings, profit FROM financial_info WHERE email = ?';
     
