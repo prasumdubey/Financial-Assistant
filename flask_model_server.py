@@ -1,39 +1,44 @@
+
 from flask import Flask, request, jsonify
 import pickle
-import numpy as np
+import pandas as pd
 import os
 
 app = Flask(__name__)
 
-# Load your pre-trained model
-model_path = 'train_model.pkl'
+model_path = "investment_predictor.pkl"
 if not os.path.exists(model_path):
-    raise FileNotFoundError(f"Model file '{model_path}' not found. Make sure it's in the correct directory.")
+    raise FileNotFoundError(f"Model file '{model_path}' not found.")
 
-with open(model_path, 'rb') as file:
-    model = pickle.load(file)
+model = pickle.load(open(model_path, "rb"))
 
-@app.route('/predict-investment', methods=['POST'])
-def predict():
+@app.route("/predict-investment", methods=["POST"])
+def predict_investment():
     try:
-        # Get JSON data from the request
-        data = request.get_json()
-        if not data or 'inputs' not in data:
-            return jsonify({'error': 'Invalid input. JSON with "inputs" is required.'}), 400
-        
-        model_input = np.array([data['inputs']])
-        
-        # Validate input size (assuming model expects 7 features)
-        if model_input.shape[1] != 7:
-            return jsonify({'error': 'Input size must be 7 features.'}), 400
-        
-        # Predict using the loaded model
-        prediction = model.predict(model_input)
-        
-        return jsonify({'prediction': int(prediction[0])})
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        data = request.json
 
-if __name__ == '__main__':
+        required_fields = [
+            "income", "assets", "expenses", "debts",
+            "liabilities", "savings", "profit"
+        ]
+
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400
+
+        input_df = pd.DataFrame([data])
+
+        prediction = model.predict(input_df)[0]
+        probability = model.predict_proba(input_df)[0][1]
+
+        return jsonify({
+            "can_invest": int(prediction),
+            "confidence": round(float(probability), 4)
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
     app.run(port=5000, debug=True)

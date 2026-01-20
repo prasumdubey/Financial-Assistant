@@ -9,7 +9,7 @@ const fs = require('fs');
 
 
 // Load environment variables from .env file
-require('dotenv').config();
+dotenv.config();
 
 const app = express();
 
@@ -38,11 +38,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Database connection
 const db = mysql.createConnection({
     host: process.env.DB_HOST,
-    user: process.env.DB_USER,
+     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME
   });
+
+// const db = mysql.createConnection({
+//   host: 'localhost',
+//   user: 'root', // ✅ Your DB username
+//   password: 'MySQLPras@21', // ✅ Your DB password
+//   database: 'financial_assistant' // ✅ Your DB name
+// });
   
+
 // Connect to the database
 db.connect((err) => {
     if (err) {
@@ -502,35 +510,70 @@ app.get('/predict-investment', isAuthenticated, (req, res) => {
 //     });
 // });
 
-app.post('/can-invest', isAuthenticated, (req, res) => {
-    const query = 'SELECT income, total_assets, expenses, debt, total_liabilities, savings, profit FROM financial_info WHERE email = ?';
+// app.post('/can-invest', isAuthenticated, (req, res) => {
+//     const query = 'SELECT income, total_assets, expenses, debt, total_liabilities, savings, profit FROM financial_info WHERE email = ?';
     
-    db.query(query, [req.session.email], (err, results) => {
-        if (err) {
-            console.error('Error fetching financial data:', err);
-            return res.status(500).send('Error fetching financial data.');
-        }
+//     db.query(query, [req.session.email], (err, results) => {
+//         if (err) {
+//             console.error('Error fetching financial data:', err);
+//             return res.status(500).send('Error fetching financial data.');
+//         }
 
-        if (results.length === 0) {
-            return res.status(404).send('No financial data found.');
-        }
+//         if (results.length === 0) {
+//             return res.status(404).send('No financial data found.');
+//         }
 
-        const financialData = results[0];
+//         const financialData = results[0];
 
-        // Calculate the safe money based on the formula
-        const safeMoney = (
-            0.5 * (parseFloat(financialData.income) - parseFloat(financialData.expenses)) +
-            0.2 * parseFloat(financialData.total_assets) -
-            0.7 * parseFloat(financialData.debt) -
-            0.6 * parseFloat(financialData.total_liabilities) +
-            0.4 * parseFloat(financialData.savings) +
-            0.5 * parseFloat(financialData.profit)
-        );
+//         // Calculate the safe money based on the formula
+//         const safeMoney = (
+//             0.5 * (parseFloat(financialData.income) - parseFloat(financialData.expenses)) +
+//             0.2 * parseFloat(financialData.total_assets) -
+//             0.7 * parseFloat(financialData.debt) -
+//             0.6 * parseFloat(financialData.total_liabilities) +
+//             0.4 * parseFloat(financialData.savings) +
+//             0.5 * parseFloat(financialData.profit)
+//         );
 
-        res.json({ safeMoney: safeMoney.toFixed(2) }); // Return the result as JSON
+//         res.json({ safeMoney: safeMoney.toFixed(2) }); // Return the result as JSON
+//     });
+// });
+
+app.post("/api/can-invest-ml", isAuthenticated, async (req, res) => {
+  try {
+    const {
+      income,
+      assets,
+      expenses,
+      debts,
+      liabilities,
+      savings,
+      profit
+    } = req.body;
+
+    const flaskResponse = await axios.post(
+      "http://localhost:5000/predict-investment",
+      {
+        income,
+        assets,
+        expenses,
+        debts,
+        liabilities,
+        savings,
+        profit
+      }
+    );
+
+    res.json({
+      success: true,
+      ml_result: flaskResponse.data
     });
-});
 
+  } catch (error) {
+    console.error("Flask ML API error:", error.message);
+    res.status(500).json({ error: "ML service unavailable" });
+  }
+});
 
 
 app.get('/history', isAuthenticated, (req, res) => {

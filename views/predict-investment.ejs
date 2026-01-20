@@ -239,7 +239,7 @@
         </div>
     </div>
 
-    <script>
+    <!-- <script>
         const form = document.getElementById('predictForm');
         const resultDiv = document.getElementById('result');
         const spinner = document.getElementById('spinner');
@@ -372,6 +372,107 @@
                     });
             }, 2000); // Simulate 2 seconds delay
         };
-    </script>
+    </script> -->
+
+    <script>
+  const form = document.getElementById('predictForm');
+  const resultDiv = document.getElementById('result');
+  const spinner = document.getElementById('spinner');
+  const ctx = document.getElementById('investmentChart').getContext('2d');
+
+  const investmentChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Safe Money to Invest',
+        data: [],
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+
+  form.onsubmit = async function (event) {
+    event.preventDefault();
+
+    resultDiv.innerText = '';
+    spinner.style.display = 'block';
+
+    try {
+      const response = await fetch('/api/can-invest-ml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          income: 45000,
+          assets: 120000,
+          expenses: 20000,
+          debts: 15000,
+          liabilities: 30000,
+          savings: 25000,
+          profit: 8000
+        })
+      });
+
+      const data = await response.json();
+      spinner.style.display = 'none';
+
+      if (!data.success) {
+        resultDiv.innerText = 'ML prediction failed.';
+        return;
+      }
+
+      const mlResult = data.ml_result;
+      const safeMoney = mlResult.safeMoney || mlResult.prediction || 0;
+
+      if (safeMoney <= 0) {
+        resultDiv.innerText = 'You cannot invest as your score is negative or zero.';
+        return;
+      }
+
+      // Animate result
+      const endValue = Math.round(safeMoney);
+      const steps = 10;
+      const stepValue = Math.ceil(endValue / steps);
+      const stepDuration = 3000 / steps;
+      let currentValue = 0;
+      let stepCount = 0;
+
+      investmentChart.data.labels = [];
+      investmentChart.data.datasets[0].data = [];
+
+      const counter = setInterval(() => {
+        if (stepCount >= steps) {
+          currentValue = endValue;
+          clearInterval(counter);
+        } else {
+          currentValue += stepValue;
+          stepCount++;
+          if (currentValue > endValue) currentValue = endValue;
+        }
+
+        resultDiv.innerText = `Safe money you can invest: ₹${currentValue}`;
+
+        investmentChart.data.labels.push(`Step ${stepCount}`);
+        investmentChart.data.datasets[0].data.push(currentValue);
+        investmentChart.update();
+      }, stepDuration);
+
+    } catch (error) {
+      spinner.style.display = 'none';
+      resultDiv.innerText = 'Error predicting investment.';
+      console.error('Error:', error);
+    }
+  };
+</script>
+
 </body>
 </html>
